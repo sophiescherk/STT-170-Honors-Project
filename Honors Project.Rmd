@@ -1,0 +1,171 @@
+---
+title: "Honors Project"
+author: "Sophie Scherkenbach"
+date: "2025-04-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup2}
+
+#Clean the global enviornment
+rm(list = ls())
+
+#Load all the packages that will be needed
+library(tidyverse)
+library(infer)
+library(ggplot2)
+library(broom)
+
+#Read in the data set
+wars <- read.csv("C:/Users/sophi/Downloads/Inter-StateWarData_v4.0.csv")
+
+```
+
+```{r glimpse}
+
+#Look at the structure of the data set
+#Explore the variables
+glimpse(wars)
+
+```
+**Main Research Question: How has the duration and frequency of interstate wars changed over time, and does war severity (measured by battle deaths) relate to war duration?**
+
+*I am exploring this question to find out if wars have gotten shorter over time. My prediction is that they have because the development of technology will expedite the process of war. Wars would've been slower when it was done using swords and muskets vs. the bombs and missiles of today. *
+
+*Severity of the wars will be measured by the number of deaths. I am also trying to find out if battle deaths have gone up or down as time has passed and technology has changed.My prediction is that they will have increased over time. This is because weapons are much mroe deadly nowaddays than they were back then.  *
+
+**Main Variables**
+
+*StartYear1 & EndYear1: These will be used to measure the duration of each war.*
+
+*Duration: This variable will be made by subtracting the start year from the end year of each war to find out how long each one lasted. *
+
+*BatDeath: This is the (estimated) number of deaths in each war.*
+
+
+*We need to first clean the data to get rid of the NA values. In this data set's case, there are no NA values, but -9 represents an NA value. So, we want to filter the data to get rid of all of these values.*
+
+```{r filtering}
+
+#Cleaning the data to get rid of this data set's version of NA values. 
+wars_filtered <- wars %>%
+  filter(EndYear1 != -9 & StartYear1 != -9 )
+
+```
+
+*We create the duration variable by subtracting start years from the end years. Then, we will find the summary statistics for the Duration and BatDeath variables. For the duration variable, the mean od 2.255 years is greater than the median of 1 year. This suggests that the data for duration is skewed to the right. For the number of deaths, the mean of 95,196 people is much higher than the median of 2000 people, which means this data is also skewed to the right.*
+
+```{r summaries}
+
+#Creating the duration varible to find out the length of each war
+wars_filtered$Duration <- wars$EndYear1 - wars$StartYear1 + 1
+
+#finding the summary statistics of the durations of the wars
+summary(wars_filtered$Duration)
+
+#finding the summary statistics of the number of deaths
+summary(wars_filtered$BatDeath)
+
+```
+
+*We want to find out the average duration and numbers of deaths of the wars for each seperate decade because it will tell us if it has increased or decreased over time. The table shows us that the average number of deaths has fluctuated over time and there is not a clear relationship between number of deaths and time. The table also shows that the duration of wars over the decades has decreased overall. *
+
+```{r Duration by decade}
+
+
+duration_by_decade <- wars_filtered %>%
+  #make a decade variable
+  mutate(Decade = floor(StartYear1 / 10) * 10) %>%
+  #grouping the war stats by decade
+  group_by(Decade) %>%
+  #finds the average duration for each decade
+  summarise(AvgDuration = mean(Duration),
+            AvgDeaths = mean(BatDeath, na.rm = TRUE),
+            WarCount = n())
+
+#print our findings
+duration_by_decade
+
+```
+
+
+*Now we want to visualize the amount of deaths per war over time using ggplot2. The graph confirms what the table showed, which is that there is an overall decrease of average deaths over time. It also confirms what the table said, which is to say that despite there being an overall decrease from 1800 to 2000, there isn't a clear relationship between the variables.*
+
+```{r War Deaths over time}
+
+ggplot(duration_by_decade, aes(x = Decade, y = AvgDeaths)) +
+  #lines to connect the points
+  geom_line(color = "lightblue", size = 1.2) +
+  scale_y_log10(labels = scales::comma_format()) +
+  geom_point(size = 2) +
+  labs(title = "Average Number of Deaths of Interstate Wars by Decade",
+       x = "Decade",
+       y = "Average Deaths") +
+  theme_minimal()
+
+```
+
+*Now we want to visualize the duration of each war over time using ggplot2.The graph shows a clear negative relationship between duration and time. As time goes on, the average duration of war has decreased, except for notable exceptions around WWII and the Vietnam war. *
+
+```{r War Duration over time}
+
+ggplot(duration_by_decade, aes(x = Decade, y = AvgDuration)) +
+  #lines to connect the points
+  geom_line(color = "lightblue", size = 1.2) +
+  geom_point(size = 2) +
+  labs(title = "Average Duration of Interstate Wars by Decade",
+       x = "Decade",
+       y = "Average Duration (Years)") +
+  theme_minimal()
+
+```
+
+*Next, we find the linear regression model for war duration vs the number of deaths. The equation for the linear regression line is found to be -79,298.45 + 77374.31 x Duration*
+
+```{r linear regression}
+
+#finding the linear regression line for Duration vs. Number of Deaths
+mod.fit <- lm(BatDeath ~ Duration, data = wars_filtered)
+
+#tidying the data to read it
+mod.fit %>%
+  broom::tidy()
+
+```
+
+
+*Now, we will use the linear regression line and ggplot2 to plot the relationship between duration and deaths. The graphs show a positive relationship between duration and number of deaths. *
+
+```{r War Duration vs. Battle Deaths}
+
+ggplot(wars_filtered, aes(x = Duration, y = BatDeath)) +
+  geom_jitter(alpha = 0.6, color = "black") +
+  #add the linear regression line
+  geom_smooth(method = "lm", color = "red") +
+  #fixing the scale of the y axis
+  scale_y_log10(labels = scales::comma_format()) +  
+  labs(title = "War Duration vs Battle Deaths",
+       x = "Duration (Years)",
+       y = "Battle Deaths (log scale)") +
+  theme_minimal()
+
+```
+
+*Finally, we will find the number of wars per decade using ggplot2. The bar graph shows that there isn't really an increase or decrease of the number of wars per decade.*
+
+```{r Number of Wars per Decade}
+
+ggplot(duration_by_decade, aes(x = Decade, y = WarCount)) +
+  geom_col(fill = "skyblue", color = "black") +
+  labs(title = "Number of Interstate Wars by Decade",
+       x = "Decade",
+       y = "Number of Wars") +
+  theme_minimal()
+
+```
+
+*In conclusion, number of deaths has not really changed, and duration of war has decreased over time. My predication that the duration has decreaed was correct, and I still suspect that it is because of developing technologies. However, my hypothesis that deaths have increased was incorrect.*
